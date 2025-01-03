@@ -1,4 +1,4 @@
-# Native extension template
-This template contains the basic setup for creation of a Defold native extension.
+# Defold native extension for Recast Navigation
+[https://recastnav.com](https://recastnav.com)
 
-You can learn more about native extensions in the [official manual](https://www.defold.com/manuals/extensions/).
+Idea is to use Recast Demo to build and test navigation mesh, import it into custom resources, then load and use inside Defold for path searching.
