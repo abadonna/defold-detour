@@ -1,0 +1,29 @@
+function init(self)
+	local data = sys.load_resource("/assets/navmesh.bin")
+	local query = detour.load(data) -- different agents may require different navmeshes
+
+	--query:set_area_cost({1, 10, 1, 1, 2, 1.5}) -- ground, water, road, door, grass, jump
+	--query:set_include_flags(0x01);
+
+	local path = query:find_path(go.get_position("/start"), go.get_position("/finish") --[[, dtStraightPathOptions --]]) 
+
+	self.co = coroutine.create(function ()
+		for _, p in ipairs(path) do
+			local v = vmath.vector4(p.x, p.y, p.z, 0)
+			local duration = vmath.length(go.get_position("/start") - p) / 10.;
+			-- move capsule's fake shadow
+			go.animate("/level#model", "entity", go.PLAYBACK_ONCE_FORWARD, v, go.EASING_LINEAR, duration)
+			-- move capsule to the next point
+			go.animate("/start", "position", go.PLAYBACK_ONCE_FORWARD, p, go.EASING_LINEAR, duration, 0,
+			function()
+				coroutine.resume(self.co);
+			end)
+			coroutine.yield()
+		end
+
+		query:delete() -- if you don't need it anymore
+	end)
+
+	coroutine.resume(self.co);
+end
+
