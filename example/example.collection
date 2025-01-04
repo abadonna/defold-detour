@@ -59,7 +59,7 @@ embedded_instances {
   "  material: \\\"/example/materials/model.material\\\"\\n"
   "  textures {\\n"
   "    sampler: \\\"tex0\\\"\\n"
-  "    texture: \\\"/example/textures/sphere.jpg\\\"\\n"
+  "    texture: \\\"/example/textures/red.jpg\\\"\\n"
   "  }\\n"
   "}\\n"
   "\"\n"
@@ -83,15 +83,90 @@ embedded_instances {
   "  material: \\\"/example/materials/model.material\\\"\\n"
   "  textures {\\n"
   "    sampler: \\\"tex0\\\"\\n"
-  "    texture: \\\"/example/textures/sphere.jpg\\\"\\n"
+  "    texture: \\\"/example/textures/red.jpg\\\"\\n"
   "  }\\n"
   "}\\n"
   "\"\n"
+  "  position {\n"
+  "    y: -3.054552\n"
+  "  }\n"
   "}\n"
   ""
   position {
     x: -15.0
     y: 9.0
     z: 4.376683
+  }
+}
+embedded_instances {
+  id: "agent1"
+  data: "embedded_components {\n"
+  "  id: \"model\"\n"
+  "  type: \"model\"\n"
+  "  data: \"mesh: \\\"/example/models/capsule.glb\\\"\\n"
+  "name: \\\"{{NAME}}\\\"\\n"
+  "materials {\\n"
+  "  name: \\\"default\\\"\\n"
+  "  material: \\\"/example/materials/model.material\\\"\\n"
+  "  textures {\\n"
+  "    sampler: \\\"tex0\\\"\\n"
+  "    texture: \\\"/example/textures/green.jpg\\\"\\n"
+  "  }\\n"
+  "}\\n"
+  "\"\n"
+  "}\n"
+  ""
+  position {
+    x: 2.620045
+    y: -1.13146
+    z: 8.178943
+  }
+}
+embedded_instances {
+  id: "agent2"
+  data: "embedded_components {\n"
+  "  id: \"model\"\n"
+  "  type: \"model\"\n"
+  "  data: \"mesh: \\\"/example/models/capsule.glb\\\"\\n"
+  "name: \\\"{{NAME}}\\\"\\n"
+  "materials {\\n"
+  "  name: \\\"default\\\"\\n"
+  "  material: \\\"/example/materials/model.material\\\"\\n"
+  "  textures {\\n"
+  "    sampler: \\\"tex0\\\"\\n"
+  "    texture: \\\"/example/textures/green.jpg\\\"\\n"
+  "  }\\n"
+  "}\\n"
+  "\"\n"
+  "}\n"
+  ""
+  position {
+    x: 4.169115
+    y: -1.658286
+    z: 9.733436
+  }
+}
+embedded_instances {
+  id: "agent3"
+  data: "embedded_components {\n"
+  "  id: \"model\"\n"
+  "  type: \"model\"\n"
+  "  data: \"mesh: \\\"/example/models/capsule.glb\\\"\\n"
+  "name: \\\"{{NAME}}\\\"\\n"
+  "materials {\\n"
+  "  name: \\\"default\\\"\\n"
+  "  material: \\\"/example/materials/model.material\\\"\\n"
+  "  textures {\\n"
+  "    sampler: \\\"tex0\\\"\\n"
+  "    texture: \\\"/example/textures/green.jpg\\\"\\n"
+  "  }\\n"
+  "}\\n"
+  "\"\n"
+  "}\n"
+  ""
+  position {
+    x: -0.188999
+    y: -1.552921
+    z: 6.048354
   }
 }

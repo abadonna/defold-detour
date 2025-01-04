@@ -22,9 +22,43 @@ function init(self)
 			coroutine.yield()
 		end
 
-		query:delete() -- if you don't need it anymore
+		--query:delete() -- if you don't need it anymore
 	end)
 
 	coroutine.resume(self.co);
+
+	---------------------------------------
+	-- The crowd not only handles a lot of the path management for you, 
+	-- but also local steering and dynamic avoidance between members of the crowd. 
+	----------------------------------------------
+
+	local max_agent_radius = 1.0;
+	self.crowd = query:create_crowd(max_agent_radius)
+	self.agents = {}
+	
+	for i = 1, 3 do
+		local position = go.get_position("/agent" .. i)
+		local radius = 1.0
+		local height = 1.0
+		local max_acceletion = 8
+		local max_speed = 5
+		
+		local id = self.crowd:add_agent(position, radius, height, max_acceletion, max_speed)
+		self.agents[id] = "/agent" .. i
+	end
+
+	local target = go.get_position("/finish")
+	self.crowd:set_target(target)
+
+end
+
+function update(self, dt)
+	if self.crowd then
+		local data = self.crowd:update(dt)
+
+		for id, agent in pairs(data) do
+			go.set_position(agent.position, self.agents[id])
+		end
+	end
 end
 

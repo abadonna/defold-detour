@@ -5,9 +5,10 @@
 // include the Defold SDK
 #include <dmsdk/sdk.h>
 
-#include "Detour/DetourCommon.h"
-#include "Detour/DetourNavMesh.h"
-#include "Detour/DetourNavMeshQuery.h"
+#include "DetourCommon.h"
+#include "DetourNavMesh.h"
+#include "DetourNavMeshQuery.h"
+#include "DetourCrowd.h"
 #include <vector>
 
 using namespace dmVMath;
@@ -51,14 +52,18 @@ enum SamplePolyFlags
 };
 
 static const int MAX_POLYS = 256;
+static const int MAX_AGENTS = 128;
 
 struct NavMesh {
     dtNavMesh* mesh;
     dtNavMeshQuery* query;
     dtQueryFilter* filter;
+    dtCrowd* crowd;
 };
 
 vector<NavMesh*> meshes;
+
+float polyPickExt[3] = {2, 4, 2};
 
 static int Delete(lua_State* L) {
     lua_getfield(L, 1, "instance");
@@ -66,6 +71,8 @@ static int Delete(lua_State* L) {
 
     dtFreeNavMesh(instance->mesh);
     dtFreeNavMeshQuery(instance->query);
+    dtFreeCrowd(instance->crowd);
+    
     delete instance->filter;
    
     meshes.erase(find(meshes.begin(), meshes.end(), instance));
@@ -87,9 +94,6 @@ static int FindPath(lua_State* L) {
     float start[3] = {vs->getX(), vs->getY(), vs->getZ()};
     float finish[3] = {vf->getX(), vf->getY(), vf->getZ()};
 
-    float polyPickExt[3] = {2, 4, 2};
-
-    
     dtPolyRef startRef;
     dtPolyRef endRef;
     dtPolyRef polys[MAX_POLYS];
@@ -182,6 +186,159 @@ static int SetIncludeFlags(lua_State* L) {
     return 0;
 }
 
+static int AddAgent(lua_State* L) {
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+    
+    Vector3* p = dmScript::CheckVector3(L, 2);
+    float pos[3] = {p->getX(), p->getY(), p->getZ()};
+
+    dtCrowdAgentParams ap;
+    memset(&ap, 0, sizeof(ap));
+    ap.radius = luaL_checknumber(L, 3);
+    ap.height = luaL_checknumber(L, 4);
+    ap.maxAcceleration = luaL_checknumber(L, 5);
+    ap.maxSpeed = luaL_checknumber(L, 6);
+    
+    ap.collisionQueryRange = ap.radius * 12.0f;
+    ap.pathOptimizationRange = ap.radius * 30.0f;
+    ap.updateFlags = 0; 
+
+    /*
+
+    if (m_toolParams.m_anticipateTurns)
+    ap.updateFlags |= DT_CROWD_ANTICIPATE_TURNS;
+    if (m_toolParams.m_optimizeVis)
+    ap.updateFlags |= DT_CROWD_OPTIMIZE_VIS;
+    if (m_toolParams.m_optimizeTopo)
+    ap.updateFlags |= DT_CROWD_OPTIMIZE_TOPO;
+    if (m_toolParams.m_obstacleAvoidance)
+    ap.updateFlags |= DT_CROWD_OBSTACLE_AVOIDANCE;
+    if (m_toolParams.m_separation)
+    ap.updateFlags |= DT_CROWD_SEPARATION;
+    ap.obstacleAvoidanceType = (unsigned char)m_toolParams.m_obstacleAvoidanceType;
+    ap.separationWeight = m_toolParams.m_separationWeight;
+
+    */
+
+    int idx = instance->crowd->addAgent(pos, &ap);
+    lua_pushnumber(L, idx);
+    
+    return 1;
+}
+
+static int SetTarget(lua_State* L) {
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+
+    Vector3* p = dmScript::CheckVector3(L, 2);
+    float pos[3] = {p->getX(), p->getY(), p->getZ()};
+
+    float targetPos[3];
+    dtPolyRef targetRef;
+    
+    instance->query->findNearestPoly(pos, polyPickExt, instance->filter, &targetRef, targetPos);
+
+    for (int i = 0; i < instance->crowd->getAgentCount(); ++i) {
+        const dtCrowdAgent* ag = instance->crowd->getAgent(i);
+        if (!ag->active) continue;
+        instance->crowd->requestMoveTarget(i, targetRef, targetPos);
+    }
+
+    return 0;
+}
+
+static int Update(lua_State* L) {
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+
+    dtCrowdAgentDebugInfo agentDebug;
+    instance->crowd->update(luaL_checknumber(L, 2), &agentDebug);
+
+    lua_newtable(L);
+    
+    for (int i = 0; i < instance->crowd->getAgentCount(); ++i)
+    {
+        const dtCrowdAgent* ag = instance->crowd->getAgent(i);
+        if (!ag->active) continue;
+
+        lua_pushnumber(L, i);
+        
+        lua_newtable(L);
+        lua_pushstring(L, "position");
+        dmScript::PushVector3(L, Vector3(ag->npos[0], ag->npos[1], ag->npos[2]));
+        lua_settable(L, -3);
+
+        lua_settable(L, -3);
+    }
+    
+    return 1;
+}
+
+static int CreateCrowd(lua_State* L) {
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+
+    float maxAgentRadius = luaL_checknumber(L, 2);
+    if (instance->crowd == NULL) {
+        instance->crowd = dtAllocCrowd();
+    }
+
+    instance->crowd->init(MAX_AGENTS, maxAgentRadius, instance->mesh);
+    // Make polygons with 'disabled' flag invalid.
+    instance->crowd->getEditableFilter(0)->setExcludeFlags(SAMPLE_POLYFLAGS_DISABLED);
+    // Setup local avoidance params to different qualities.
+    dtObstacleAvoidanceParams params;
+    // Use mostly default settings, copy from dtCrowd.
+    memcpy(&params, instance->crowd->getObstacleAvoidanceParams(0), sizeof(dtObstacleAvoidanceParams));
+
+    // Low (11)
+    params.velBias = 0.5f;
+    params.adaptiveDivs = 5;
+    params.adaptiveRings = 2;
+    params.adaptiveDepth = 1;
+    instance->crowd->setObstacleAvoidanceParams(0, &params);
+
+    // Medium (22)
+    params.velBias = 0.5f;
+    params.adaptiveDivs = 5; 
+    params.adaptiveRings = 2;
+    params.adaptiveDepth = 2;
+    instance->crowd->setObstacleAvoidanceParams(1, &params);
+
+    // Good (45)
+    params.velBias = 0.5f;
+    params.adaptiveDivs = 7;
+    params.adaptiveRings = 2;
+    params.adaptiveDepth = 3;
+    instance->crowd->setObstacleAvoidanceParams(2, &params);
+
+    // High (66)
+    params.velBias = 0.5f;
+    params.adaptiveDivs = 7;
+    params.adaptiveRings = 3;
+    params.adaptiveDepth = 3;
+
+    instance->crowd->setObstacleAvoidanceParams(3, &params);
+
+    
+    lua_newtable(L);
+    lua_pushstring(L, "instance");
+    lua_pushlightuserdata(L, instance);
+    lua_settable(L, -3);
+
+    static const luaL_Reg f[] =
+    {
+        {"add_agent", AddAgent},
+        {"set_target", SetTarget},
+        {"update", Update},
+        {0, 0}
+    };
+    luaL_register(L, NULL, f);
+
+    return 1;
+}
+
 static int Load(lua_State* L) {
     const char* content = luaL_checkstring(L, 1);
 
@@ -236,6 +393,7 @@ static int Load(lua_State* L) {
     filter->setExcludeFlags(0);
 
     instance->filter = filter;
+    instance->crowd = NULL;
 
     meshes.push_back(instance);
 
@@ -249,6 +407,7 @@ static int Load(lua_State* L) {
         {"find_path", FindPath},
         {"set_area_cost", SetAreaCost},
         {"set_include_flags", SetIncludeFlags},
+        {"create_crowd", CreateCrowd},
         {"delete", Delete},
         {0, 0}
     };
