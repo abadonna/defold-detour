@@ -125,11 +125,33 @@ static int FindPath(lua_State* L) {
         if (nstraightPath) {
             for (int i = 0; i < nstraightPath; ++i) {
                 lua_pushnumber(L, i);
+                lua_newtable(L);
+                lua_pushstring(L, "position");
                 int idx = i * 3;
                 dmScript::PushVector3(L, Vector3(straightPath[idx], straightPath[idx + 1], straightPath[idx + 2]));
                 lua_settable(L, -3);
-                //TODO: return also a poly area type and point flag (dtStraightPathFlags)
-                //so we can determine if we need to swim or jump
+
+                lua_pushstring(L, "area");
+                unsigned char area;
+                instance->mesh->getPolyArea(straightPathPolys[i], &area);
+                lua_pushnumber(L, area);
+                lua_settable(L, -3);
+
+                if (straightPathFlags[i] == DT_STRAIGHTPATH_START) {
+                    lua_pushstring(L, "start");
+                    lua_pushboolean(L, true);
+                    lua_settable(L, -3);
+                } else if (straightPathFlags[i] == DT_STRAIGHTPATH_END) {
+                    lua_pushstring(L, "end");
+                    lua_pushboolean(L, true);
+                    lua_settable(L, -3);
+                } else if (straightPathFlags[i] == DT_STRAIGHTPATH_OFFMESH_CONNECTION) {
+                    lua_pushstring(L, "offmesh");
+                    lua_pushboolean(L, true);
+                    lua_settable(L, -3);
+                }
+
+                lua_settable(L, -3);
             }
         }
     }

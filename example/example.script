@@ -8,7 +8,8 @@ function init(self)
 	local path = query:find_path(go.get_position("/start"), go.get_position("/finish") --[[, dtStraightPathOptions --]]) 
 
 	self.co = coroutine.create(function ()
-		for _, p in ipairs(path) do
+		for _, point in ipairs(path) do
+			local p = point.position
 			local v = vmath.vector4(p.x, p.y, p.z, 0)
 			local duration = vmath.length(go.get_position("/start") - p) / 10.;
 			-- move capsule's fake shadow
