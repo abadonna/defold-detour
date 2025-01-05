@@ -18,7 +18,6 @@ function init(self)
 	self.co = coroutine.create(function ()
 		for _, point in ipairs(path) do
 			local p = point.position
-			p.y = p.y -1
 			local v = vmath.vector4(p.x, p.y, p.z, 0)
 			
 			local duration = vmath.length(go.get_position("/start") - p) / 10.;
