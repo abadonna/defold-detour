@@ -12,7 +12,7 @@ embedded_instances {
   "  data: \"mesh: \\\"/example/models/level.glb\\\"\\n"
   "name: \\\"{{NAME}}\\\"\\n"
   "materials {\\n"
-  "  name: \\\"default\\\"\\n"
+  "  name: \\\"Default\\\"\\n"
   "  material: \\\"/example/materials/level.material\\\"\\n"
   "  textures {\\n"
   "    sampler: \\\"tex0\\\"\\n"

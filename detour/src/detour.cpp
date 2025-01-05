@@ -104,8 +104,6 @@ static int FindPath(lua_State* L) {
 
     instance->query->findPath(startRef, endRef, start, finish, instance->filter, polys, &npolys, MAX_POLYS);
 
-    dmLogInfo("npolys: %d", npolys);
-
     lua_newtable(L);
 
     if (npolys) {
@@ -123,8 +121,6 @@ static int FindPath(lua_State* L) {
         instance->query->findStraightPath(start, epos, polys, npolys,
             straightPath, straightPathFlags,
             straightPathPolys, &nstraightPath, MAX_POLYS, straightPathOptions);
-
-        dmLogInfo("nstraightPath: %d", nstraightPath);
 
         if (nstraightPath) {
             for (int i = 0; i < nstraightPath; ++i) {
@@ -202,24 +198,10 @@ static int AddAgent(lua_State* L) {
     
     ap.collisionQueryRange = ap.radius * 12.0f;
     ap.pathOptimizationRange = ap.radius * 30.0f;
-    ap.updateFlags = 0; 
 
-    /*
-
-    if (m_toolParams.m_anticipateTurns)
-    ap.updateFlags |= DT_CROWD_ANTICIPATE_TURNS;
-    if (m_toolParams.m_optimizeVis)
-    ap.updateFlags |= DT_CROWD_OPTIMIZE_VIS;
-    if (m_toolParams.m_optimizeTopo)
-    ap.updateFlags |= DT_CROWD_OPTIMIZE_TOPO;
-    if (m_toolParams.m_obstacleAvoidance)
-    ap.updateFlags |= DT_CROWD_OBSTACLE_AVOIDANCE;
-    if (m_toolParams.m_separation)
-    ap.updateFlags |= DT_CROWD_SEPARATION;
-    ap.obstacleAvoidanceType = (unsigned char)m_toolParams.m_obstacleAvoidanceType;
-    ap.separationWeight = m_toolParams.m_separationWeight;
-
-    */
+    ap.updateFlags = luaL_checknumber(L, 7);   
+    ap.obstacleAvoidanceType = 3; //high
+    //ap.separationWeight = m_toolParams.m_separationWeight;
 
     int idx = instance->crowd->addAgent(pos, &ap);
     lua_pushnumber(L, idx);
@@ -227,7 +209,18 @@ static int AddAgent(lua_State* L) {
     return 1;
 }
 
+static int RemoveAgent(lua_State* L) {
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+
+    int idx = lua_tonumber(L, 3);
+    instance->crowd->removeAgent(idx);
+    
+    return 0;
+}
+
 static int SetTarget(lua_State* L) {
+    int count = lua_gettop(L);
     lua_getfield(L, 1, "instance");
     NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
 
@@ -239,10 +232,34 @@ static int SetTarget(lua_State* L) {
     
     instance->query->findNearestPoly(pos, polyPickExt, instance->filter, &targetRef, targetPos);
 
+    if (count > 2) {
+        int idx = lua_tonumber(L, 3);
+        instance->crowd->requestMoveTarget(idx, targetRef, targetPos);
+        return 0;
+    }
+    
     for (int i = 0; i < instance->crowd->getAgentCount(); ++i) {
         const dtCrowdAgent* ag = instance->crowd->getAgent(i);
         if (!ag->active) continue;
         instance->crowd->requestMoveTarget(i, targetRef, targetPos);
+    }
+
+    return 0;
+}
+
+static int ResetTarget(lua_State* L) {
+    int count = lua_gettop(L);
+    lua_getfield(L, 1, "instance");
+    NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
+
+    if (count > 1) {
+        int idx = lua_tonumber(L, 2);
+        instance->crowd->resetMoveTarget(idx);
+        return 0;
+    }
+
+    for (int i = 0; i < instance->crowd->getAgentCount(); ++i) {
+        instance->crowd->resetMoveTarget(i);
     }
 
     return 0;
@@ -267,6 +284,20 @@ static int Update(lua_State* L) {
         lua_newtable(L);
         lua_pushstring(L, "position");
         dmScript::PushVector3(L, Vector3(ag->npos[0], ag->npos[1], ag->npos[2]));
+        lua_settable(L, -3);
+
+        lua_pushstring(L, "velocity");
+        dmScript::PushVector3(L, Vector3(ag->vel[0], ag->vel[1], ag->vel[2]));
+        lua_settable(L, -3);
+
+        lua_pushstring(L, "state");
+        if (ag->state == DT_CROWDAGENT_STATE_WALKING) {
+            lua_pushstring(L, "walk");
+        } else if (ag->state == DT_CROWDAGENT_STATE_OFFMESH) {
+            lua_pushstring(L, "offmesh");
+        } else {
+            lua_pushstring(L, "invalid");
+        }
         lua_settable(L, -3);
 
         lua_settable(L, -3);
@@ -330,7 +361,9 @@ static int CreateCrowd(lua_State* L) {
     static const luaL_Reg f[] =
     {
         {"add_agent", AddAgent},
+        {"remove_agent", RemoveAgent},
         {"set_target", SetTarget},
+        {"reset_target", ResetTarget},
         {"update", Update},
         {0, 0}
     };
@@ -339,7 +372,7 @@ static int CreateCrowd(lua_State* L) {
     return 1;
 }
 
-static int Load(lua_State* L) {
+static int Init(lua_State* L) {
     const char* content = luaL_checkstring(L, 1);
 
     NavMeshSetHeader* header = (NavMeshSetHeader*)&content[0];
@@ -420,7 +453,7 @@ static int Load(lua_State* L) {
 // Functions exposed to Lua
 static const luaL_reg Module_methods[] =
 {
-    {"load", Load},
+    {"init", Init},
     {0, 0}
 };
 

@@ -1,6 +1,14 @@
+-- crowd agent update flags
+local ANTICIPATE_TURNS = 1
+local OBSTACLE_AVOIDANCE = 2
+local SEPARATION = 4
+local OPTIMIZE_VIS = 8
+local OPTIMIZE_TOPO = 16 
+---------------------------
+
 function init(self)
 	local data = sys.load_resource("/assets/navmesh.bin")
-	local query = detour.load(data) -- different agents may require different navmeshes
+	local query = detour.init(data) -- different agents may require different navmeshes
 
 	--query:set_area_cost({1, 10, 1, 1, 2, 1.5}) -- ground, water, road, door, grass, jump
 	--query:set_include_flags(0x01);
@@ -10,7 +18,9 @@ function init(self)
 	self.co = coroutine.create(function ()
 		for _, point in ipairs(path) do
 			local p = point.position
+			p.y = p.y -1
 			local v = vmath.vector4(p.x, p.y, p.z, 0)
+			
 			local duration = vmath.length(go.get_position("/start") - p) / 10.;
 			-- move capsule's fake shadow
 			go.animate("/level#model", "entity", go.PLAYBACK_ONCE_FORWARD, v, go.EASING_LINEAR, duration)
@@ -30,7 +40,7 @@ function init(self)
 	---------------------------------------
 	-- The crowd not only handles a lot of the path management for you, 
 	-- but also local steering and dynamic avoidance between members of the crowd. 
-	----------------------------------------------
+	----------------------------------------
 
 	local max_agent_radius = 1.0;
 	self.crowd = query:create_crowd(max_agent_radius)
@@ -42,23 +52,43 @@ function init(self)
 		local height = 1.0
 		local max_acceletion = 8
 		local max_speed = 5
+		local flags = 0
+
+		flags = bit.bor(flags, ANTICIPATE_TURNS, OBSTACLE_AVOIDANCE, SEPARATION, OPTIMIZE_VIS, OPTIMIZE_TOPO)
 		
-		local id = self.crowd:add_agent(position, radius, height, max_acceletion, max_speed)
+		local id = self.crowd:add_agent(position, radius, height, max_acceletion, max_speed, flags)
 		self.agents[id] = "/agent" .. i
 	end
 
 	local target = go.get_position("/finish")
 	self.crowd:set_target(target)
 
+
+	------------------------------------------
+	-- self.crowd:set_target(target, [agent_id])
+	-- self.crowd:remove_agent(agent_id) 
+	-- self.crowd:reset_target([agent_id])
+	------------------------------------------
+
 end
 
 function update(self, dt)
 	if self.crowd then
 		local data = self.crowd:update(dt)
-
+		local forward = vmath.vector3(0,0,-1)
+		
 		for id, agent in pairs(data) do
 			go.set_position(agent.position, self.agents[id])
+
+			-- e.g. we can rotate models according velocity
+			agent.velocity.y = 0
+			agent.velocity = vmath.normalize(agent.velocity)
+
+			if agent.velocity.x ~= agent.velocity.x then return end --nan?
+
+			local euler = math.acos(vmath.dot(agent.velocity, forward))
+			go.set(self.agents[id], "euler.y", math.deg(euler))	
+
 		end
 	end
 end
-
