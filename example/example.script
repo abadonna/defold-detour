@@ -11,9 +11,16 @@ function init(self)
 	local query = detour.init(data) -- different agents may require different navmeshes
 
 	--query:set_area_cost({1, 10, 1, 1, 2, 1.5}) -- ground, water, road, door, grass, jump
-	--query:set_include_flags(0x01);
+	--query:set_include_flags(0x01) -- walk, etc - see SamplePolyFlags in detour.cpp
+	--query:find_path(start, finish, [options]) 
+	
+	--[[ find path options (optional): 
+			0x01 - Add a vertex at every polygon edge crossing where area changes.
+			0x02 - Add a vertex at every polygon edge crossing.
+	--]]
 
-	local path = query:find_path(go.get_position("/start"), go.get_position("/finish") --[[, dtStraightPathOptions --]]) 
+
+	local path = query:find_path(go.get_position("/start"), go.get_position("/finish")) 
 
 	self.co = coroutine.create(function ()
 		for _, point in ipairs(path) do
@@ -82,11 +89,13 @@ function update(self, dt)
 			-- e.g. we can rotate models according velocity
 			agent.velocity.y = 0
 			agent.velocity = vmath.normalize(agent.velocity)
-
-			if agent.velocity.x ~= agent.velocity.x then return end --nan?
-
-			local euler = math.acos(vmath.dot(agent.velocity, forward))
-			go.set(self.agents[id], "euler.y", math.deg(euler))	
+			if agent.velocity.x == agent.velocity.x then -- not nan
+				local d = vmath.dot(forward, agent.velocity)
+				local q = vmath.quat_from_to(forward, agent.velocity)
+				if d > -0.99999 then 
+					go.set_rotation(q, self.agents[id])
+				end
+			end
 
 		end
 	end
