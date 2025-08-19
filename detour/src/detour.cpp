@@ -213,7 +213,7 @@ static int RemoveAgent(lua_State* L) {
     lua_getfield(L, 1, "instance");
     NavMesh* instance = (NavMesh*)lua_touserdata(L, -1);
 
-    int idx = lua_tonumber(L, 3);
+    int idx = lua_tonumber(L, 2);
     instance->crowd->removeAgent(idx);
     
     return 0;
